@@ -81,38 +81,38 @@ void updateServo() {
   }
 }
 
-// void goToX(float endPos, int time) {
-//   int startPos = currentPosX;
+void goToX(float endPos, int time) {
+  int startPos = currentPosX;
 
-//   for (int i = 0; i < time; i++) {
-//     float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
-//     currentPosX = index * (endPos - startPos) + startPos;
-//     monServoX.write(currentPosX);
-//     delay(1);
-//   }
-// }
+  for (int i = 0; i < time; i++) {
+    float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
+    currentPosX = index * (endPos - startPos) + startPos;
+    monServoX.write(currentPosX);
+    delay(1);
+  }
+}
 
-// void goToY(float endPos, int time) {
-//   int startPos = currentPosY;
+void goToY(float endPos, int time) {
+  int startPos = currentPosY;
 
-//   for (int i = 0; i < time; i++) {
-//     float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
-//     currentPosY = index * (endPos - startPos) + startPos;
-//     monServoY.write(currentPosY);
-//     delay(1);
-//   }
-// }
+  for (int i = 0; i < time; i++) {
+    float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
+    currentPosY = index * (endPos - startPos) + startPos;
+    monServoY.write(currentPosY);
+    delay(1);
+  }
+}
 
-// void goTo(float endPosX, float endPosY, int time) {
-//   int startPosX = currentPosX;
-//   int startPosY = currentPosY;
+void goTo(float endPosX, float endPosY, int time) {
+  int startPosX = currentPosX;
+  int startPosY = currentPosY;
 
-//   for (int i = 0; i < time; i++) {
-//     float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
-//     currentPosX = index * (endPosX - startPosX) + startPosX;
-//     currentPosY = index * (endPosY - startPosY) + startPosY;
-//     monServoX.write(currentPosX);
-//     monServoY.write(currentPosY);
-//     delay(1);
-//   }
-// }
+  for (int i = 0; i < time; i++) {
+    float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
+    currentPosX = index * (endPosX - startPosX) + startPosX;
+    currentPosY = index * (endPosY - startPosY) + startPosY;
+    monServoX.write(currentPosX);
+    monServoY.write(currentPosY);
+    delay(1);
+  }
+}
