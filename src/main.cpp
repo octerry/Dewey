@@ -1,118 +1,188 @@
 #include <Arduino.h>
 #include <ESP32Servo.h>
 
-// Broche connectée au fil signal (orange/jaune) du SG90
-// Choisis une broche PWM valide de la Xiao ESP32C6, par ex. D2 (GPIO2)
-const int servoPinX= D1;
-const int servoPinY= D2;
-const float APP_PI = 3.14159265;
+const int yawServoPin = D1;
+const int pitchServoPin = D2;
 
-Servo monServoX;
-Servo monServoY;
+const int minYawDeg = 45;
+const int maxYawDeg = 135;
+const int minPitchDeg = 30;
+const int maxPitchDeg = 90;
 
-float currentPosX = 0;
-float currentMoveX[4] = {-1}; // [startPosition, endPosition, step, time]
-float currentPosY = 0;
-float currentMoveY[4] = {-1};
+Servo yawServo;
+Servo pitchServo;
+
+// SSD1306 ECRAN OLED
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define SCREEN_ADDRESS 0x3C
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+float xProgress = 0.5;
+int eyesXPosition = 0;
+int positionDelay = 0;
+int blinkDelay = 0;
+bool blinkFace = false;
+bool goingLeft = false;
+bool positionStopped = false;
+bool needToStop = false;
+
+int pitchPosition = 50;
+int yawPosition = 90;
+
+void drawFace() {
+  display.clearDisplay();
+
+  // Yeux
+  if (blinkFace) {
+    display.drawLine(eyesXPosition - 14, 32, eyesXPosition + 14, 32, SSD1306_WHITE);
+    display.drawLine(eyesXPosition + 60 - 14, 32, eyesXPosition + 60 + 14, 32, SSD1306_WHITE);
+  } else {
+    display.fillCircle(eyesXPosition + 60, 32, 14, SSD1306_WHITE);
+    display.fillCircle(eyesXPosition, 32, 14, SSD1306_WHITE);
+  }
+
+  // Bouche
+  display.fillCircle(eyesXPosition + 30, 50, 7, SSD1306_WHITE);
+  display.fillRect(eyesXPosition + 30 - 7, 50 - 7, 15, 7, SSD1306_BLACK);
+
+  display.display();
+}
+
+float easeInOut(float n, float force) {
+  // Prends un nombre n entre 0 et 1 en entrée et lui applique un effet ease in out cubic
+  float finalN = 0;
+
+  if (n < 0.5) { // f(x) = -(-x + 0.5) ** (1/n) * 3 / 5 + 0.5
+    finalN = (-n + 0.5); // [(-x + 0.5)]
+    finalN = - pow(finalN, 1.0/force); // Racine cube [** (1/n)]
+    finalN *= 3; // [* 3]
+    finalN /= 5; // [/ 5]
+    finalN += .5; // [+ 0.5]
+  }
+  else { // f(x) = (x - 0.5) ** (1/3) * 3 / 5 + 0.5
+    finalN = n - 0.5; // [(x - 0.5)]
+    finalN = pow(finalN, 1.0/force); // Racine cube [** (1/n)]
+    finalN *= 3; // [* 3]
+    finalN /= 5; // [/ 5]
+    finalN += .5; // [+ 0.5]
+  }
+
+  return finalN;
+
+  // le code qui suit fait l'inverse (je l'ai trouvé sans faire exprès)
+  // // f(x) = (x - 0.5) ** 3 * 4 + 0.5
+  // float finalN = n - 0.5;
+  // Serial.print("=> ");
+  // Serial.print(finalN);
+  // finalN = pow(finalN, 3);
+  // Serial.print("=> ");
+  // Serial.print(finalN);
+  // finalN = finalN * 4;
+  // Serial.print("=> ");
+  // Serial.print(finalN);
+  // finalN += 0.5;
+  // Serial.print("=> ");
+  // Serial.print(finalN);
+  // return finalN;
+}
+
+void updateServo() {
+  yawPosition = xProgress * (maxYawDeg - minYawDeg) + minYawDeg;
+
+  yawServo.write(yawPosition);
+  pitchServo.write(pitchPosition);
+};
+
+void updatePosition() {
+  if (!positionStopped) {
+    // Update progress
+    if (goingLeft) {
+      if (xProgress > 0) {
+        if (xProgress <= 0.5 && needToStop) { // S'arrete pendant 3 secondes
+          needToStop = false;
+          xProgress = 0.5;
+          updateServo();
+          drawFace();
+          delay(3000);
+        }
+        xProgress -= 0.02;
+      } else {
+        xProgress = 0;
+        goingLeft = false;
+      }
+    } else {
+      if (xProgress < 1) {
+        xProgress += 0.02;
+      } else {
+        xProgress = 1;
+        goingLeft = true;
+        needToStop = true;
+      }
+    }
+
+    // Linear to ease in out
+    float finalxProgress = easeInOut(xProgress, 2);
+
+    eyesXPosition = finalxProgress * 40 + 14;
+
+    if (xProgress == 0.5 && !goingLeft) {
+      positionDelay = 160;
+      positionStopped = true;
+    }
+  } else {
+    positionDelay--;
+    if (positionDelay <= 0) {
+      positionStopped = false;
+    }
+  }
+
+  if (blinkDelay >= 100) {
+    blinkFace = true;
+    blinkDelay = 0;
+  } else {
+    blinkDelay++;
+    if (blinkDelay > 3) {
+      blinkFace = false;
+    }
+  }
+}
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
+  // SERVO
   // Autorise l'allocation de tous les timers PWM disponibles
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
   ESP32PWM::allocateTimer(2);
   ESP32PWM::allocateTimer(3);
-  monServoX.setPeriodHertz(50);       // fréquence standard des servos 50Hz
-  monServoX.attach(servoPinX, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
-  monServoY.setPeriodHertz(50);       // fréquence standard des servos 50Hz
-  monServoY.attach(servoPinY, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
 
-  setMoveX(180, 2000);
+  yawServo.setPeriodHertz(50);       // fréquence standard des servos 50Hz
+  yawServo.attach(yawServoPin, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
+  pitchServo.setPeriodHertz(50);       // fréquence standard des servos 50Hz
+  pitchServo.attach(pitchServoPin, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
+
+  Serial.println("Servo initialisé");
+
+  // SSD1306 ECRAN OLED
+  Wire.begin();
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println("Erreur : ecran SSD1306 non detecte");
+    while (true)
+      ;
+  }
 }
 
 void loop() {
-  // Balayage de 0° à 180°
-  float maxDegX = 180;
-  float maxDegY = 90;
-  int time = 1000;
-
-  if (currentMoveX[0] < 0) {
-    if (currentPosX == 180) {
-      setMoveX(0, 2000);
-    } else {
-      setMoveX(180, 2000);
-    }
-  }
-
-  Serial.print(currentMoveX[0]);
-  Serial.print(" ");
-  Serial.print(currentMoveX[1]);
-  Serial.print(" ");
-  Serial.print(currentMoveX[2]);
-  Serial.print(" ");
-  Serial.print(currentMoveX[3]);
-  Serial.print("\n");
-  
+  updatePosition();
   updateServo();
-  delay(1);
-}
-
-void setMoveX(float endPos, int time) {
-  int startPos = currentPosX;
-  int step = 0;
-  currentMoveX[0] = startPos;
-  currentMoveX[1] = endPos;
-  currentMoveX[2] = step;
-  currentMoveX[3] = time;
-}
-
-void updateServo() {
-  if (currentMoveX[0] >= 0) {
-    currentMoveX[2] += 1; // On ajoute au compteur
-    // float index = (-cos(float(step)/float(time) * APP_PI ) + 1 ) / 2; 
-    // currentPosX = index * (endPos - startPos) + startPos;
-    const float index = (-cos(float(currentMoveX[2])/float(currentMoveX[3]) * APP_PI ) + 1 ) / 2; // On calcule l'étape
-    currentPosX = index * (currentMoveX[1] - currentMoveX[0]) + currentMoveX[0]; // On applique l'étape
-    Serial.print(" ");
-    monServoX.write(currentPosX);
-
-    if (currentMoveX[2] >= currentMoveX[3]) currentMoveX[0] = -1; // Reset quand c'est fini
-  }
-}
-
-void goToX(float endPos, int time) {
-  int startPos = currentPosX;
-
-  for (int i = 0; i < time; i++) {
-    float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
-    currentPosX = index * (endPos - startPos) + startPos;
-    monServoX.write(currentPosX);
-    delay(1);
-  }
-}
-
-void goToY(float endPos, int time) {
-  int startPos = currentPosY;
-
-  for (int i = 0; i < time; i++) {
-    float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
-    currentPosY = index * (endPos - startPos) + startPos;
-    monServoY.write(currentPosY);
-    delay(1);
-  }
-}
-
-void goTo(float endPosX, float endPosY, int time) {
-  int startPosX = currentPosX;
-  int startPosY = currentPosY;
-
-  for (int i = 0; i < time; i++) {
-    float index = (-cos(float(i)/float(time) * APP_PI ) + 1 ) / 2; // -cos(2xPI)+1 / 2 (Visualise sur Geogebra si tu vois pas)
-    currentPosX = index * (endPosX - startPosX) + startPosX;
-    currentPosY = index * (endPosY - startPosY) + startPosY;
-    monServoX.write(currentPosX);
-    monServoY.write(currentPosY);
-    delay(1);
-  }
+  drawFace();
 }
