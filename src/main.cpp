@@ -32,6 +32,7 @@ bool blinkFace = false;
 bool goingLeft = false;
 bool positionStopped = false;
 bool needToStop = false;
+int waitingTime = 0;
 
 int pitchPosition = 50;
 int yawPosition = 90;
@@ -95,6 +96,7 @@ float easeInOut(float n, float force) {
 
 void updateServo() {
   yawPosition = xProgress * (maxYawDeg - minYawDeg) + minYawDeg;
+  pitchPosition = 0;
 
   yawServo.write(yawPosition);
   pitchServo.write(pitchPosition);
@@ -105,13 +107,6 @@ void updatePosition() {
     // Update progress
     if (goingLeft) {
       if (xProgress > 0) {
-        if (xProgress <= 0.5 && needToStop) { // S'arrete pendant 3 secondes
-          needToStop = false;
-          xProgress = 0.5;
-          updateServo();
-          drawFace();
-          delay(3000);
-        }
         xProgress -= 0.02;
       } else {
         xProgress = 0;
@@ -142,15 +137,31 @@ void updatePosition() {
       positionStopped = false;
     }
   }
+}
 
-  if (blinkDelay >= 100) {
+void handlePause() {    // Update progress
+  if (goingLeft) {
+    if (xProgress > 0) {
+      if (xProgress <= 0.5 && needToStop) { // S'arrete pendant 3 secondes
+        waitingTime = 3000;
+        needToStop = false;
+        xProgress = 0.5;
+        updateServo();
+        drawFace();
+      }
+    }
+  }
+}
+
+void handleBlink() {
+  if (blinkDelay >= 300) {
     blinkFace = true;
     blinkDelay = 0;
+    drawFace();
   } else {
     blinkDelay++;
-    if (blinkDelay > 3) {
-      blinkFace = false;
-    }
+    if (blinkDelay > 3) blinkFace = false;
+    if (blinkDelay == 4) drawFace();
   }
 }
 
@@ -176,13 +187,19 @@ void setup() {
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println("Erreur : ecran SSD1306 non detecte");
-    while (true)
-      ;
   }
 }
 
 void loop() {
-  updatePosition();
-  updateServo();
-  drawFace();
+  if (waitingTime <= 0) {
+    updatePosition();
+    updateServo();
+    handlePause();
+    drawFace();
+    handleBlink();
+  } else {
+    delay(20);
+    waitingTime -= 20;
+    handleBlink();
+  }
 }
