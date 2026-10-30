@@ -1,8 +1,11 @@
+#include <Arduino.h>
 #include <DFRobotDFPlayerMini.h>
 
 // UART matériel de la XIAO ESP32C6
 #define DF_RX D7   // GPIO17, reçoit depuis le TX du DFPlayer
 #define DF_TX D6   // GPIO16, envoie vers le RX du DFPlayer
+
+int playId = 1;
 
 DFRobotDFPlayerMini player;
 
@@ -20,7 +23,7 @@ void setup() {
 
   Serial.println("DFPlayer OK");
   player.volume(15);       // 0 à 30
-  player.playMp3Folder(1); // joue /MP3/0001.mp3
+  player.play(1); // joue /MP3/0001.mp3
 }
 
 void loop() {
@@ -29,8 +32,10 @@ void loop() {
     uint8_t type = player.readType();
     int value = player.read();
     if (type == DFPlayerPlayFinished) {
-      Serial.print("Piste terminée : ");
-      Serial.println(value);
+      // if (playId >= 7) playId = 0;
+      // playId += 1;
+      player.volume(30);       // 0 à 30
+      player.loop(7);
     } else if (type == DFPlayerError) {
       Serial.print("Erreur DFPlayer : ");
       Serial.println(value);
