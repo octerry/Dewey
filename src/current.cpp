@@ -1,13 +1,13 @@
 // Servo
 #include <ESP32Servo.h>
 
-const int xServoPin = D1;
-const int yServoPin = D2;
+const int X_SERVO_PIN = D1;
+const int Y_SERVO_PIN = D2;
 
-const int minXDeg = 45;
-const int maxXDeg = 135;
-const int minYDeg = 30;
-const int maxYDeg = 90;
+const int MIN_X_DEG = 45;
+const int MAX_X_DEG = 135;
+const int MIN_Y_DEG = 30;
+const int MAX_Y_DEG = 90;
 
 Servo xServo;
 Servo yServo;
@@ -108,7 +108,7 @@ float easeInOut(float n, float force) {
 }
 
 void updateServo() {
-  xPosition = xProgress * (maxXDeg - minXDeg) + minXDeg;
+  xPosition = xProgress * (MAX_X_DEG - MIN_X_DEG) + MIN_X_DEG;
   yPosition = 0;
 
   xServo.write(xPosition);
@@ -200,9 +200,9 @@ void setup() {
   ESP32PWM::allocateTimer(3);
 
   xServo.setPeriodHertz(50);       // fréquence standard des servos 50Hz
-  xServo.attach(xServoPin, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
+  xServo.attach(X_SERVO_PIN, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
   yServo.setPeriodHertz(50);       // fréquence standard des servos 50Hz
-  yServo.attach(yServoPin, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
+  yServo.attach(Y_SERVO_PIN, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
   // SSD1306 ECRAN OLED
   Wire.begin();
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {

@@ -1,14 +1,19 @@
 #include <Arduino.h>
+// Touch Sensor
+const int MIDDLE_TOUCH_PIN = D8;
+const int PLUS_TOUCH_PIN = D9;
+const int MINUS_TOUCH_PIN = D10;
+
 // Servo
 #include <ESP32Servo.h>
 
-const int xServoPin = D1;
-const int yServoPin = D2;
+const int X_SERVO_PIN = D1;
+const int Y_SERVO_PIN = D2;
 
-const int minXDeg = 45;
-const int maxXDeg = 135;
-const int minYDeg = 30;
-const int maxYDeg = 90;
+const int MIN_X_DEG = 45;
+const int MAX_X_DEG = 135;
+const int MIN_Y_DEG = 30;
+const int MAX_Y_DEG = 90;
 
 Servo xServo;
 Servo yServo;
@@ -26,12 +31,13 @@ Servo yServo;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // DFPlayer
-// #include <DFRobotDFPlayerMini.h>
+#include <DFRobotDFPlayerMini.h>
 
-// #define DF_RX D7   // GPIO17, reçoit depuis le TX du DFPlayer
-// #define DF_TX D6   // GPIO16, envoie vers le RX du DFPlayer
+#define DF_RX D7   // GPIO17, reçoit depuis le TX du DFPlayer
+#define DF_TX D6   // GPIO16, envoie vers le RX du DFPlayer
 
-// DFRobotDFPlayerMini player;
+DFRobotDFPlayerMini player;
+bool dfPlayerReady = false;
 
 
 // Script
@@ -48,14 +54,12 @@ int waitingTime = 0;
 int yPosition = 50;
 int xPosition = 90;
 
-
+bool isPlusTouched = false;
+bool isMinusTouched = false;
+int volume = 0;
 
 void drawFace() {
   display.clearDisplay();
-
-  // // DFPlayer
-  // player.volume(15); // 0 à 30
-  // player.play(1); // joue 0001.wav (starting sound)
 
   // Yeux
   if (blinkFace) {
@@ -112,7 +116,7 @@ float easeInOut(float n, float force) {
 }
 
 void updateServo() {
-  xPosition = xProgress * (maxXDeg - minXDeg) + minXDeg;
+  xPosition = xProgress * (MAX_X_DEG - MIN_X_DEG) + MIN_X_DEG;
   yPosition = 0;
 
   xServo.write(xPosition);
@@ -182,18 +186,34 @@ void handleBlink() {
   }
 }
 
-// void checkDFPlayer() {
-//   if (player.available()) {
-//     uint8_t type = player.readType();
-//     int value = player.read();
-//     if (type == DFPlayerPlayFinished) {
-//       player.volume(30); // 0 à 30
-//       player.loop(2); // Floating sound
-//     }
-//   }
-// }
+void checkDFPlayer() {
+  if (dfPlayerReady && player.available()) {
+    uint8_t type = player.readType();
+    // int value = player.read();
+    if (type == DFPlayerPlayFinished) {
+      player.volume(30); // 0 à 30
+      player.loop(2); // Floating sound
+    }
+  }
+}
+
+void handleVolume() {
+  if (digitalRead(PLUS_TOUCH_PIN)) {
+    if (volume < 30 && !isPlusTouched) volume ++;
+    isPlusTouched = true;
+    Serial.println(volume);
+  }
+
+  if (digitalRead(MINUS_TOUCH_PIN)) {
+    if (volume > 0 && !isMinusTouched) volume --;
+    isMinusTouched = true;
+    Serial.println(volume);
+  }
+}
 
 void setup() {
+  Serial.begin(115200);
+
   // SERVO
   // Autorise l'allocation de tous les timers PWM disponibles
   ESP32PWM::allocateTimer(0);
@@ -202,24 +222,41 @@ void setup() {
   ESP32PWM::allocateTimer(3);
 
   xServo.setPeriodHertz(50);       // fréquence standard des servos 50Hz
-  xServo.attach(xServoPin, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
+  xServo.attach(X_SERVO_PIN, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
   yServo.setPeriodHertz(50);       // fréquence standard des servos 50Hz
-  yServo.attach(yServoPin, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
+  yServo.attach(Y_SERVO_PIN, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
   // SSD1306 ECRAN OLED
   Wire.begin();
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println("Erreur : ecran SSD1306 non detecte");
+    while (true) {
+      delay(1000);
+    }
+  }
+
+  Serial1.begin(9600, SERIAL_8N1, DF_RX, DF_TX);
+  dfPlayerReady = player.begin(Serial1);
+  if (dfPlayerReady) {
+    player.volume(15);
+    player.play(1);
+  } else {
+    Serial.println("Erreur : DFPlayer non detecte");
+  }
 }
 
 void loop() {
+  handleVolume();
   if (waitingTime <= 0) {
     updatePosition();
     updateServo();
     handlePause();
     drawFace();
     handleBlink();
-    analogWrite("POOP")
-    // checkDFPlayer();
+    checkDFPlayer();
   } else {
-    // player.pause();
+    if (dfPlayerReady) {
+      player.pause();
+    }
     delay(20);
     waitingTime -= 20;
     handleBlink();
