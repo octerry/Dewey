@@ -1,44 +1,51 @@
 #include <Arduino.h>
-#include <DFRobotDFPlayerMini.h>
 
-// UART matériel de la XIAO ESP32C6
-#define DF_RX D7   // GPIO17, reçoit depuis le TX du DFPlayer
-#define DF_TX D6   // GPIO16, envoie vers le RX du DFPlayer
+const int LED_PIN = D3;
+const int MIDDLE_TOUCH_PIN = 0;
+const int PLUS_TOUCH_PIN = D1;
+const int MINUS_TOUCH_PIN = D2;
+const int MAX_LED_VALUE = 255;
 
-int playId = 1;
-
-DFRobotDFPlayerMini player;
+float ledProgress = 0;
+float ledValue = 1;
+bool middleWasTouched = false;
+bool plusWasTouched = false;
+bool minusWasTouched = false;
 
 void setup() {
   Serial.begin(115200);
-  Serial1.begin(9600, SERIAL_8N1, DF_RX, DF_TX);
 
-  Serial.println("Initialisation du DFPlayer...");
-  delay(1000); // le module a besoin d'un peu de temps au démarrage
-
-  if (!player.begin(Serial1)) {
-    Serial.println("Échec : vérifie le câblage et la carte SD.");
-    while (true) delay(100);
-  }
-
-  Serial.println("DFPlayer OK");
-  player.volume(15);       // 0 à 30
-  player.play(1); // joue /MP3/0001.mp3
+  pinMode(MIDDLE_TOUCH_PIN, INPUT);
+  pinMode(PLUS_TOUCH_PIN, INPUT);
+  pinMode(MINUS_TOUCH_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() {
-  // Messages d'état du module (fin de piste, erreurs...)
-  if (player.available()) {
-    uint8_t type = player.readType();
-    int value = player.read();
-    if (type == DFPlayerPlayFinished) {
-      // if (playId >= 7) playId = 0;
-      // playId += 1;
-      player.volume(30);       // 0 à 30
-      player.loop(7);
-    } else if (type == DFPlayerError) {
-      Serial.print("Erreur DFPlayer : ");
-      Serial.println(value);
-    }
+  if (digitalRead(PLUS_TOUCH_PIN) && ledValue < 1 && !plusWasTouched) {
+    ledValue += .1;
+    plusWasTouched = true;
+  } else if (!digitalRead(PLUS_TOUCH_PIN)) {
+    plusWasTouched = false;
   }
+  
+  if (digitalRead(MINUS_TOUCH_PIN) && ledValue > 0 && !minusWasTouched) {
+    ledValue -= .1;
+    minusWasTouched = true;
+  } else if (!digitalRead(MINUS_TOUCH_PIN)) {
+    minusWasTouched = false;
+  }
+
+  if (ledValue < 0) {
+    ledValue = 0;
+  }
+
+  // ledProgress += .01;
+  // ledValue = (cos(ledProgress) + 1) / 2;
+
+  if (digitalRead(MIDDLE_TOUCH_PIN)) {
+    analogWrite(LED_PIN, 0);
+  }
+  else analogWrite(LED_PIN, ledValue * MAX_LED_VALUE);
+  delay(10);
 }

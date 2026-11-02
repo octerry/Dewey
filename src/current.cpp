@@ -1,3 +1,4 @@
+// Servo
 #include <ESP32Servo.h>
 
 const int xServoPin = D1;
@@ -23,6 +24,17 @@ Servo yServo;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+// DFPlayer
+#include <DFRobotDFPlayerMini.h>
+
+#define DF_RX D7   // GPIO17, reçoit depuis le TX du DFPlayer
+#define DF_TX D6   // GPIO16, envoie vers le RX du DFPlayer
+
+DFRobotDFPlayerMini player;
+bool dfPlayerReady = false;
+
+
+// Script
 float xProgress = 0.5;
 int eyesXPosition = 0;
 int positionDelay = 0;
@@ -166,6 +178,17 @@ void handleBlink() {
   }
 }
 
+void checkDFPlayer() {
+  if (dfPlayerReady && player.available()) {
+    uint8_t type = player.readType();
+    // int value = player.read();
+    if (type == DFPlayerPlayFinished) {
+      player.volume(30); // 0 à 30
+      player.loop(2); // Floating sound
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -180,14 +203,22 @@ void setup() {
   xServo.attach(xServoPin, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
   yServo.setPeriodHertz(50);       // fréquence standard des servos 50Hz
   yServo.attach(yServoPin, 500, 2400); // min/max pulse width en µs (à ajuster si besoin)
-
-  Serial.println("Servo initialisé");
-
   // SSD1306 ECRAN OLED
   Wire.begin();
-
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println("Erreur : ecran SSD1306 non detecte");
+    while (true) {
+      delay(1000);
+    }
+  }
+
+  Serial1.begin(9600, SERIAL_8N1, DF_RX, DF_TX);
+  dfPlayerReady = player.begin(Serial1);
+  if (dfPlayerReady) {
+    player.volume(15);
+    player.play(1);
+  } else {
+    Serial.println("Erreur : DFPlayer non detecte");
   }
 }
 
@@ -198,7 +229,11 @@ void loop() {
     handlePause();
     drawFace();
     handleBlink();
+    checkDFPlayer();
   } else {
+    if (dfPlayerReady) {
+      player.pause();
+    }
     delay(20);
     waitingTime -= 20;
     handleBlink();
