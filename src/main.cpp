@@ -13,7 +13,7 @@ const int Y_SERVO_PIN = D2;
 const int MIN_X_DEG = 45;
 const int MAX_X_DEG = 135;
 const int MIN_Y_DEG = 30;
-const int MAX_Y_DEG = 90;
+const int MAX_Y_DEG = 120;
 
 Servo xServo;
 Servo yServo;
@@ -42,6 +42,7 @@ bool dfPlayerReady = false;
 
 // Script
 float xProgress = 0.5;
+float yProgress = 0.5;
 int eyesXPosition = 0;
 int positionDelay = 0;
 int blinkDelay = 0;
@@ -117,13 +118,15 @@ float easeInOut(float n, float force) {
 
 void updateServo() {
   xPosition = xProgress * (MAX_X_DEG - MIN_X_DEG) + MIN_X_DEG;
-  yPosition = 0;
+  yPosition = yProgress * (MAX_Y_DEG - MIN_Y_DEG) + MIN_Y_DEG;
 
   xServo.write(xPosition);
   yServo.write(yPosition);
 };
 
 void updatePosition() {
+  yProgress = 0;
+
   if (!positionStopped) {
     // Update progress
     if (goingLeft) {
@@ -245,7 +248,6 @@ void setup() {
 }
 
 void loop() {
-  handleVolume();
   if (waitingTime <= 0) {
     updatePosition();
     updateServo();
@@ -261,4 +263,5 @@ void loop() {
     waitingTime -= 20;
     handleBlink();
   }
+  handleVolume();
 }
