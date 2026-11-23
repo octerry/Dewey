@@ -3,12 +3,12 @@
 
 // Broche connectée au fil signal (orange/jaune) du SG90
 // Choisis une broche PWM valide de la Xiao ESP32C6, par ex. D2 (GPIO2)
-const int servoPin = D4;
+const int servoPin = D2;
 
 Servo monServo;
 
 // INPUT: Potentiometer should be connected to 5V and GND
-int potPin = D2; // Potentiometer output connected to analog pin 3
+int potPin = A0; // Potentiometer output connected to analog pin 3
 int potVal = 0; // Variable to store the input from the potentiometer
 
 // OUTPUT: Use digital pins 9-11, the Pulse-width Modulation (PWM) pins
@@ -38,19 +38,26 @@ void setup()
   Serial.println("Servo initialisé");
 }
 
+float readPoten() {
+  const float pinValue = analogRead(potPin);
+  const float pourcentage = (pinValue / 26) / 100;
+  float deg = pourcentage * 180 - 22;
+
+  if (deg >= 180) deg = 180;
+
+  return deg;   // read the potentiometer value at the input pin
+}
+
 // Main program
 void loop()
 {
-  potVal = analogRead(potPin);   // read the potentiometer value at the input pin
-
-  Serial.println(potVal);
-
   // Balayage de 0° à 180°
-  float deg = 90;
+  float maxDeg = 90;
   float time = 1000;
-
-  for (int i = 0; i < time; i++) {
-    monServo.write(i * (deg/time));
+  int i = readPoten();
+  for (; i < time; i++) {
+    Serial.println(readPoten());
+    monServo.write(i * (maxDeg/time));
     delay(1);
   }
 
@@ -58,7 +65,8 @@ void loop()
 
   // Retour de 180° à 0°
   for (int i = 0; i < time; i++) {
-    monServo.write(deg - (i * (deg/time)));
+    Serial.println(readPoten());
+    monServo.write(maxDeg - (i * (maxDeg/time)));
     delay(1);
   }
 
